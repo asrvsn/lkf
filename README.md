@@ -1,4 +1,4 @@
-# Stochastic estimation of perturbed systems
+# Stochastic estimation of partially known systems
 
 "Learning Kalman Filter: a Variational Method for Online System Identification," under review. This library contains benchmarks for the continuous-time Kalman filter and its adaptive variant, Learning Kalman Filter. LKF performs online parameter adaptation by fluctuation suppression of the filter performance. Current benchmarks are structurally unstable 2x2 systems perturbed with Gaussian noise; higher-dimensional and nonlinear systems are forthcoming. 
 
