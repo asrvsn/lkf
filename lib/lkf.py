@@ -2,8 +2,8 @@
 '''
 
 from systems import *
-from integrator import Integrator
 from utils import set_seed
+from lib.integrator import Integrator
 
 from typing import Callable
 import numpy as np
@@ -33,11 +33,10 @@ class LKF(LSProcess):
 			# TODO fix all stateful references in this body
 
 			state = state.reshape(self.ode_shape)
-			x_t, P_t, eta_t = state[:, :1], state[:, 1:1+self.ndim], state[:, 1+self.ndim:]
+			x_t, P_t = state[:, :1], state[:, 1:1+self.ndim]
 			z_t = z_t[:, np.newaxis]
 			K_t = P_t@self.H@np.linalg.inv(self.R)
 
-			d_eta = np.zeros((self.ndim, self.ndim)) 
 			if t > self.tau: # TODO warmup case?
 				H_inv = np.linalg.inv(self.H)
 				P_inv = np.linalg.solve(P_t.T@P_t + self.eps*np.eye(self.ndim), P_t.T)
@@ -46,18 +45,14 @@ class LKF(LSProcess):
 				tau_n = int(self.tau / self.dt)
 				err_t, err_tau = err_hist[-1][:,np.newaxis], err_hist[-tau_n][:,np.newaxis]
 				p_t, p_tau = self.P_hist[-1], self.P_hist[-tau_n]
-				# d_zz = (err_t@err_t.T - err_tau@err_tau.T) 
-				d_zz = (err_t@err_t.T - err_tau@err_tau.T) / self.tau - self.H@(p_t - p_tau)@self.H.T / self.tau
-				self.e_zz_t = d_zz
+				e_zz = (err_t@err_t.T - err_tau@err_tau.T) / self.tau - self.H@(p_t - p_tau)@self.H.T / self.tau
+				self.e_zz_t = e_zz
+				self.eta_t = self.gamma * H_inv@e_zz@H_inv.T@P_inv / 2
 
-				eta_new = self.gamma * H_inv@d_zz@H_inv.T@P_inv / 2
-				if np.linalg.norm(eta_new) <= eta_bnd:
-					d_eta = (eta_new - eta_t) / self.dt
-
-			F_est = F_t - eta_t
+			F_est = F_t - self.eta_t
 			d_x = F_est@x_t + K_t@(z_t - self.H@x_t)
 			d_P = F_est@P_t + P_t@F_est.T + self.Q - K_t@self.R@K_t.T
-			d_state = np.concatenate((d_x, d_P, d_eta), axis=1)
+			d_state = np.concatenate((d_x, d_P), axis=1)
 			return d_state.ravel() # Flatten for integrator
 
 		def g(t, state):
@@ -73,22 +68,22 @@ class LKF(LSProcess):
 		eta0 = np.zeros((self.ndim, self.ndim))
 		self.eta_t = eta0
 
-		iv = np.concatenate((x0, P0, eta0), axis=1).ravel() # Flatten for integrator
+		iv = np.concatenate((x0, P0), axis=1).ravel() # Flatten for integrator
 		self.r = Integrator(f, g, self.ode_ndim)
 		self.r.set_initial_value(iv, 0.)
 
 	def load_vars(self, state: np.ndarray):
 		state = state.reshape(self.ode_shape)
-		x_t, P_t, eta_t = state[:, :1], state[:, 1:1+self.ndim], state[:, 1+self.ndim:]
-		return x_t, P_t, eta_t
+		x_t, P_t = state[:, :1], state[:, 1:1+self.ndim]
+		return x_t, P_t
 
 	def __call__(self, z_t: np.ndarray):
 		''' Observe through filter ''' 
 		self.r.set_f_params(z_t, self.err_hist, self.F(self.t))
 		self.r.integrate(self.t + self.dt)
-		x_t, P_t, eta_t = self.load_vars(self.r.y)
+		x_t, P_t = self.load_vars(self.r.y)
 		self.P_hist.append(P_t)
-		self.x_t, self.P_t, self.eta_t = x_t, P_t, eta_t
+		self.x_t, self.P_t = x_t, P_t
 		x_t = np.squeeze(x_t)
 		err_t = z_t - x_t@self.H.T
 		self.err_hist.append(err_t)
@@ -96,15 +91,11 @@ class LKF(LSProcess):
 
 	@property
 	def ode_shape(self):
-		return (self.ndim, 1 + 2*self.ndim) # representational dimension: x_t, P_t, eta_t
+		return (self.ndim, 1 + self.ndim) # representational dimension: x_t, P_t
 
 	@property
 	def ode_ndim(self):
 		return self.ode_shape[0] * self.ode_shape[1] # for raveled representation
-
-	def f_eta(self, eta: np.ndarray):
-		""" density function of variations """
-		return stats.multivariate_normal.pdf(eta.ravel(), mean=self.eta_mu*np.ones(4), cov=self.eta_var*np.ones(4))
 
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt

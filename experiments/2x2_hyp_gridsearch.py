@@ -2,10 +2,9 @@
 '''
 
 from systems import *
-from integrator import Integrator
 from utils import *
 from pool_executor import pool_execute
-from lkf import LKF
+from lib.lkf import LKF
 from systems import *
 
 from typing import Callable

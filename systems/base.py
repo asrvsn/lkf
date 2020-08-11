@@ -1,7 +1,7 @@
 ''' Stochastic linear systems
 '''
 
-from integrator import *
+from lib.integrator import *
 
 from typing import Callable
 import numpy as np

@@ -2,8 +2,8 @@
 '''
 
 from systems import *
-from integrator import Integrator
 from utils import set_seed
+from lib.integrator import Integrator
 
 from typing import Callable
 import numpy as np

@@ -1,7 +1,6 @@
 from systems import Oscillator, LSProcess
-from integrator import Integrator
 from utils import set_seed, rmse
-from lkf import LKF
+from lib.lkf import LKF
 
 from typing import Callable
 import numpy as np

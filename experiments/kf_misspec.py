@@ -1,7 +1,6 @@
 from systems import Oscillator, LSProcess
-from integrator import Integrator
 from utils import set_seed
-from kf import KF
+from lib.kf import KF
 
 from typing import Callable
 import numpy as np

@@ -1,10 +1,9 @@
 """ Noisy LTI example """ 
 
 from systems import *
-from integrator import Integrator
 from utils import set_seed
-from lkf import LKF
-from kf import KF
+from lib.lkf import LKF
+from lib.kf import KF
 
 from typing import Callable
 import numpy as np
