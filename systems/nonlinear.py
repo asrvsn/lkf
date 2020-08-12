@@ -14,11 +14,12 @@ import totorch.operators as op
 from totorch.predict import extrapolate
 
 class HiddenProcess:
-	def __init__(self, x0: np.ndarray, sys: Callable, proj: Callable, dt: float, H: np.ndarray, var_v: float, ndim: int):
+	def __init__(self, x0: np.ndarray, sys: Callable, F: Callable, proj: Callable, dt: float, H: np.ndarray, var_v: float, ndim: int):
 		''' Arbitrary diff.eq with observation noise ''' 
 		self.x0 = x0
 		self.r = ode(sys).set_integrator('dopri5').set_initial_value(x0)
 		self.dt = dt
+		self.F = F
 		self.proj = proj
 		self.H = H
 		self.var_v = var_v
@@ -61,13 +62,13 @@ class VanDerPol(HiddenProcess):
 		self.K = op.solve(self.x_fit, obs=self.obs)
 		assert not torch.isnan(self.K).any().item(), 'Got NaN in the model!'
 
-		# Store differential model
-		F = transferop_to_diff(self.K)
-		self.F = lambda t: F
+		# Compute differential model
+		F0 = transferop_to_diff(self.K)
+		F = lambda t: F0
 		# F = self.K.cpu().numpy()
 		# self.F = lambda t: F
 
-		super().__init__(x0, sys, proj, dt, H, var_v, k)
+		super().__init__(x0, sys, F, proj, dt, H, var_v, k)
 
 	def show_model(self):
 		pred_x = extrapolate(self.x_fit[:,0], self.K, self.obs, self.x_fit.shape[1]-1)
@@ -104,7 +105,8 @@ class Lorenz(HiddenProcess):
 		# Init features
 		p, d, k = 2, 3, 9
 		self.obs = PolynomialObservable(p, d, k)
-		H = lambda x: self.obs.__call__numpy(x)
+		proj = lambda x: self.obs.call__numpy(x)
+		H = np.eye(k)
 
 		# Fit linear model
 		a, b = 0, 30
@@ -114,11 +116,13 @@ class Lorenz(HiddenProcess):
 		self.K = op.solve(self.x_fit, obs=self.obs)
 		assert not torch.isnan(self.K).any().item(), 'Got NaN in the model!'
 
-		# Store differential model
-		F = transferop_to_diff(self.K)
-		self.F = lambda t: F
+		# Compute differential model
+		F0 = transferop_to_diff(self.K)
+		F = lambda t: F0
+		# F = self.K.cpu().numpy()
+		# self.F = lambda t: F
 
-		super().__init__(x0, sys, H, dt, var_v, k)
+		super().__init__(x0, sys, F, proj, dt, H, var_v, k)
 
 	def show_model(self):
 		pred_x = extrapolate(self.x_fit[:,0], self.K, self.obs, self.x_fit.shape[1]-1)
@@ -146,8 +150,8 @@ class Lorenz(HiddenProcess):
 if __name__ == '__main__':
 	set_seed(9001)
 
-	z = VanDerPol(1e-4, 1.0)
-	z.show_model()
+	# z = VanDerPol(1e-4, 1.0)
+	# z.show_model()
 
 	z = Lorenz(5e-3, 1.0)
 	z.show_model()

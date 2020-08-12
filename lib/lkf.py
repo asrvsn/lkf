@@ -51,6 +51,7 @@ class LKF(LSProcess):
 				P_inv = pinv(P_t, eps=self.eps)
 				self.P_inv_t = P_inv
 				self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
+				self.eta_t = self.eta_t.T
 
 				# C_inv_t = pinv(C_t, eps=self.eps)
 				# eta_t = self.gamma / 2 * pinv(P_t@self.H.T@C_inv_t@self.H, eps=self.eps)
