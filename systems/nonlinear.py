@@ -64,6 +64,8 @@ class VanDerPol(HiddenProcess):
 		# Store differential model
 		F = transferop_to_diff(self.K)
 		self.F = lambda t: F
+		# F = self.K.cpu().numpy()
+		# self.F = lambda t: F
 
 		super().__init__(x0, sys, proj, dt, H, var_v, k)
 
@@ -144,7 +146,7 @@ class Lorenz(HiddenProcess):
 if __name__ == '__main__':
 	set_seed(9001)
 
-	z = VanDerPol(1e-3, 1.0)
+	z = VanDerPol(1e-4, 1.0)
 	z.show_model()
 
 	z = Lorenz(5e-3, 1.0)

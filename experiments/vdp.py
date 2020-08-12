@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 set_seed(9001)
 
 dt = 1e-3
-T = 50.
+T = 10.
 
-z = VanDerPol(dt, 1.0)
+z = VanDerPol(dt, 0.1)
 F_hat = z.F
 x0 = z.proj(z.x0)
 eta0 = np.zeros((z.ndim, z.ndim))
@@ -26,11 +26,11 @@ eta = lambda t: eta0
 
 print(F_hat(0))
 f1 = KF(x0, F_hat, z.H, z.Q, z.R, dt)
-f2 = LKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.25, eps=1e-3, gamma=0.25)
+f2 = LKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.1, eps=1e-3, gamma=0.25)
 
-max_err = 100.
+max_err = 10.
 max_eta_err = 100
-max_zz = 100. 
+max_zz = 1000. 
 
 hist_t = []
 hist_z = []
@@ -43,6 +43,9 @@ while z.t <= T:
 	z_t = z()
 	x1_t, err1_t = f1(z_t)
 	x2_t, err2_t = f2(z_t)
+
+	z_t, x1_t, err1_t, x2_t, err2_t = z_t[:z.obs.d], x1_t[:z.obs.d], err1_t[:z.obs.d], x2_t[:z.obs.d], err2_t[:z.obs.d] 
+
 	hist_z.append(z_t)
 	hist_t.append(z.t)
 	hist_f1_x.append(x1_t) 
@@ -51,10 +54,10 @@ while z.t <= T:
 	hist_f2_err.append(err2_t)
 	hist_eta.append(f2.eta_t.copy())
 
-	# # Error condition 1
-	# if np.linalg.norm(err2_t) > max_err:
-	# 	print('Error overflowed!')
-	# 	break
+	# Error condition 1
+	if np.linalg.norm(err2_t) > max_err:
+		print('Error overflowed!')
+		break
 
 	# # Error condition 2
 	# if np.linalg.norm(f2.eta_t - eta(z.t)) > max_eta_err:
@@ -71,9 +74,9 @@ start, end = None, None # for case analysis
 every = 1
 
 hist_t = np.array(hist_t)[start:end:every]
-hist_z = np.array(hist_z)[start:end:every, :z.obs.d]
-hist_f1_x = np.array(hist_f1_x)[start:end:every, :z.obs.d]
-hist_f2_x = np.array(hist_f2_x)[start:end:every, :z.obs.d]
+hist_z = np.array(hist_z)[start:end:every]
+hist_f1_x = np.array(hist_f1_x)[start:end:every]
+hist_f2_x = np.array(hist_f2_x)[start:end:every]
 hist_f1_err = np.array(hist_f1_err)[start:end:every]
 hist_f1_res = np.linalg.norm(hist_f1_err, axis=1)
 hist_f2_err = np.array(hist_f2_err)[start:end:every]
