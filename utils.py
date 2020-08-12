@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import torch
+import scipy.linalg as linalg
 
 def set_seed(seed=None):
 	random.seed(seed)
@@ -12,3 +13,9 @@ def set_seed(seed=None):
 
 def rms(arr): 
 	return np.sqrt(np.mean(arr ** 2))
+
+def diff_to_transferop(A: np.ndarray):
+	return linalg.expm(A)
+
+def transferop_to_diff(A: np.ndarray):
+	return linalg.logm(A, disp=False)[0]

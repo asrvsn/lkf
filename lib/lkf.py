@@ -11,6 +11,9 @@ import pandas as pd
 import pdb
 import scipy.stats as stats
 
+def pinv(X: np.ndarray, eps: float=1e-4):
+	return np.linalg.solve(X.T@X + eps*np.eye(X.shape[0]), X.T)
+
 class LKF(LSProcess):
 	def __init__(self, x0: np.ndarray, F: Callable, H: np.ndarray, Q: np.ndarray, R: np.ndarray, dt: float, tau=float('inf'), eta_bnd=float('inf'), eps=1e-4, gamma=1.):
 		self.F = F
@@ -26,8 +29,8 @@ class LKF(LSProcess):
 
 		self.err_hist = []
 		self.P_hist = []
-		self.e_zz_t = np.zeros((self.ndim, self.ndim)) # temp var..
-		self.p_inv_t = np.zeros((self.ndim, self.ndim)) # temp var..
+		self.C_t = np.zeros((self.ndim, self.ndim)) # temp var..
+		self.P_inv_t = np.zeros((self.ndim, self.ndim)) # temp var..
 
 		def f(t, state, z_t, err_hist, F_t):
 			# TODO fix all stateful references in this body
@@ -38,16 +41,20 @@ class LKF(LSProcess):
 			K_t = P_t@self.H@np.linalg.inv(self.R)
 
 			if t > self.tau: # TODO warmup case?
-				H_inv = np.linalg.inv(self.H)
-				P_inv = np.linalg.solve(P_t.T@P_t + self.eps*np.eye(self.ndim), P_t.T)
-				self.p_inv_t = P_inv
-
 				tau_n = int(self.tau / self.dt)
 				err_t, err_tau = err_hist[-1][:,np.newaxis], err_hist[-tau_n][:,np.newaxis]
-				p_t, p_tau = self.P_hist[-1], self.P_hist[-tau_n]
-				e_zz = (err_t@err_t.T - err_tau@err_tau.T) / self.tau - self.H@(p_t - p_tau)@self.H.T / self.tau
-				self.e_zz_t = e_zz
-				self.eta_t = self.gamma * H_inv@e_zz@H_inv.T@P_inv / 2
+				P_tau = self.P_hist[-tau_n]
+				C_t = (err_t@err_t.T - err_tau@err_tau.T) / self.tau - self.H@(P_t - P_tau)@self.H.T / self.tau
+				self.C_t = C_t
+
+				H_inv = np.linalg.inv(self.H)
+				P_inv = pinv(P_t, eps=self.eps)
+				self.P_inv_t = P_inv
+				self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
+
+				# C_inv_t = pinv(C_t, eps=self.eps)
+				# eta_t = self.gamma / 2 * pinv(P_t@self.H.T@C_inv_t@self.H, eps=self.eps)
+				# self.eta_t = eta_t
 
 			F_est = F_t - self.eta_t
 			d_x = F_est@x_t + K_t@(z_t - self.H@x_t)
@@ -143,8 +150,8 @@ if __name__ == '__main__':
 		hist_x.append(x_t) 
 		hist_err.append(err_t)
 		hist_eta.append(f.eta_t.copy()) # variation
-		hist_ezz.append(f.e_zz_t.copy())
-		hist_pin.append(f.p_inv_t.copy())
+		hist_ezz.append(f.C_t.copy())
+		hist_pin.append(f.P_inv_t.copy())
 		hist_p.append(f.P_t.copy())
 
 		# Error condition 1
@@ -158,7 +165,7 @@ if __name__ == '__main__':
 			break
 
 		# Error condition 3
-		if np.linalg.norm(f.e_zz_t) > max_zz:
+		if np.linalg.norm(f.C_t) > max_zz:
 			print('d_zz overflowed!')
 			break
 

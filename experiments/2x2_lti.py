@@ -62,7 +62,7 @@ while z.t <= T:
 		break
 
 	# Error condition 3
-	if np.linalg.norm(f2.e_zz_t) > max_zz:
+	if np.linalg.norm(f2.C_t) > max_zz:
 		print('d_zz overflowed!')
 		break
 
