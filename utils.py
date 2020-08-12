@@ -18,4 +18,4 @@ def diff_to_transferop(A: np.ndarray):
 	return linalg.expm(A)
 
 def transferop_to_diff(A: np.ndarray):
-	return linalg.logm(A, disp=False)[0]
+	return np.real(linalg.logm(A, disp=False)[0])

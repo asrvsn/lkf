@@ -14,18 +14,24 @@ import totorch.operators as op
 from totorch.predict import extrapolate
 
 class HiddenProcess:
-	def __init__(self, x0: np.ndarray, sys: Callable, H: Callable, dt: float, var_v: float):
+	def __init__(self, x0: np.ndarray, sys: Callable, proj: Callable, dt: float, H: np.ndarray, var_v: float, ndim: int):
 		''' Arbitrary diff.eq with observation noise ''' 
+		self.x0 = x0
 		self.r = ode(sys).set_integrator('dopri5').set_initial_value(x0)
 		self.dt = dt
+		self.proj = proj
 		self.H = H
 		self.var_v = var_v
+		# For compatibility
+		self.ndim = ndim
+		self.R = np.eye(ndim) * var_v
+		self.Q = np.eye(ndim) * 0.
 
 	def __call__(self):
 		''' Observe process '''
 		self.r.integrate(self.t + self.dt)
-		x_t = self.r.y
-		y_t = self.H(x_t)
+		x_t = np.array(self.r.y)
+		y_t = self.H@self.proj(x_t)
 		v_t = self.var_v * np.random.normal(0.0, np.sqrt(self.dt), y_t.shape[0])
 		z_t = y_t + v_t
 		return z_t 
@@ -39,13 +45,13 @@ class VanDerPol(HiddenProcess):
 		if mu == None:
 			mu = lambda t: 3.0
 		sys = lambda t, z: [z[1], mu(t)*(1-z[0]**2)*z[1] - z[0]]
-		x0 = [1, 0]
+		x0 = np.array([1, 0])
 
 		# Init features
 		p, d, k = 4, 2, 8
 		self.obs = PolynomialObservable(p, d, k)
-		self.ndim = k
-		H = lambda x: obs(x)
+		proj = lambda x: self.obs.call__numpy(x)
+		H = np.eye(k)
 
 		# Fit linear model
 		a, b = 0, 20
@@ -59,7 +65,7 @@ class VanDerPol(HiddenProcess):
 		F = transferop_to_diff(self.K)
 		self.F = lambda t: F
 
-		super().__init__(x0, sys, H, dt, var_v)
+		super().__init__(x0, sys, proj, dt, H, var_v, k)
 
 	def show_model(self):
 		pred_x = extrapolate(self.x_fit[:,0], self.K, self.obs, self.x_fit.shape[1]-1)
@@ -96,8 +102,7 @@ class Lorenz(HiddenProcess):
 		# Init features
 		p, d, k = 2, 3, 9
 		self.obs = PolynomialObservable(p, d, k)
-		self.ndim = k
-		H = lambda x: obs(x)
+		H = lambda x: self.obs.__call__numpy(x)
 
 		# Fit linear model
 		a, b = 0, 30
@@ -111,7 +116,7 @@ class Lorenz(HiddenProcess):
 		F = transferop_to_diff(self.K)
 		self.F = lambda t: F
 
-		super().__init__(x0, sys, H, dt, var_v)
+		super().__init__(x0, sys, H, dt, var_v, k)
 
 	def show_model(self):
 		pred_x = extrapolate(self.x_fit[:,0], self.K, self.obs, self.x_fit.shape[1]-1)
@@ -139,8 +144,8 @@ class Lorenz(HiddenProcess):
 if __name__ == '__main__':
 	set_seed(9001)
 
-	# z = VanDerPol(1e-3, 1.0)
-	# z.show_model()
+	z = VanDerPol(1e-3, 1.0)
+	z.show_model()
 
 	z = Lorenz(5e-3, 1.0)
 	z.show_model()
