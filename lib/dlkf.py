@@ -92,7 +92,7 @@ class DLKF:
 				
 				# Method 3
 				A_t = P_t - K_t@self.H@P_t
-				eta_t = self.gamma * inner_opt(F_t, A_t, self.eta_t, C_t, tol=1e-6)
+				eta_t = self.gamma * inner_opt(F_t, A_t, np.zeros((self.ndim, self.ndim)), C_t, tol=1e-6)
 				self.eta_t = eta_t
 
 			# # Method 1

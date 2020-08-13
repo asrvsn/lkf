@@ -27,9 +27,9 @@ eta = lambda t: eta0
 
 print(F_hat(0))
 f1 = DKF(x0, F_hat, z.H, z.Q, z.R, dt)
-f2 = DLKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.3, gamma=0.75)
+f2 = DLKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.3, gamma=1.0)
 
-max_err = 50.
+max_err = 500.
 max_eta_err = 100
 max_zz = 1000. 
 
@@ -45,7 +45,7 @@ while z.t <= T:
 	x1_t, err1_t = f1(z_t)
 	x2_t, err2_t = f2(z_t)
 
-	z_t, x1_t, err1_t, x2_t, err2_t = z_t[:z.obs.d], x1_t[:z.obs.d], err1_t[:z.obs.d], x2_t[:z.obs.d], err2_t[:z.obs.d] 
+	z_t, x1_t, x2_t = z_t[:z.obs.d], x1_t[:z.obs.d], x2_t[:z.obs.d]
 
 	hist_z.append(z_t)
 	hist_t.append(z.t)
