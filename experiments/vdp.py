@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 set_seed(9001)
 
-dt = 1e-3
+dt = 1e-4
 T = 10.
 
 z = VanDerPol(dt, 0.1)

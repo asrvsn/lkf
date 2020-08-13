@@ -22,7 +22,6 @@ class LKF(LSProcess):
 		self.R = R
 		self.dt = dt
 		self.tau = tau
-		self.tau_n = int(self.tau / self.dt)
 		self.eps = eps
 		self.eta_bnd = eta_bnd
 		self.gamma = gamma
@@ -33,41 +32,32 @@ class LKF(LSProcess):
 		self.C_t = np.zeros((self.ndim, self.ndim)) # temp var..
 		self.P_inv_t = np.zeros((self.ndim, self.ndim)) # temp var..
 
-		self.P_act_till = np.zeros((self.tau_n, self.ndim, self.ndim))
-
-		def f(t, state, z_t):
+		def f(t, state, z_t, err_hist, F_t):
 			# TODO fix all stateful references in this body
 
 			state = state.reshape(self.ode_shape)
 			x_t, P_t = state[:, :1], state[:, 1:1+self.ndim]
 			z_t = z_t[:, np.newaxis]
 			K_t = P_t@self.H@np.linalg.inv(self.R)
-			F_t = self.F(t)
 
 			if t > self.tau: # TODO warmup case?
-				# Method 1
-				err_t, err_tau = self.err_hist[-1][:,np.newaxis], self.err_hist[-self.tau_n][:,np.newaxis]
-				P_tau = self.P_hist[-self.tau_n]
-				act_Pdt = (err_t@err_t.T - err_tau@err_tau.T) / self.tau 
+				tau_n = int(self.tau / self.dt)
+				err_t, err_tau = err_hist[-1][:,np.newaxis], err_hist[-tau_n][:,np.newaxis]
+				P_tau = self.P_hist[-tau_n]
+
+				# act_Pdt = (err_t@err_t.T - err_tau@err_tau.T) / self.tau 
+				act_Pdt = np.gradient(err_hist[-tau_n:])
 				est_Pdt = self.H@(P_t - P_tau)@self.H.T / self.tau
-
-				# Method 2
-				# for i in range(self.tau_n):
-				# 	self.P_act_till[i] = np.outer(self.err_hist[-self.tau_n+i], self.err_hist[-self.tau_n+i])
-				# act_Pdt = np.gradient(self.P_act_till, self.dt, axis=0).mean(axis=0)
-				# est_Pdt = np.gradient(self.P_hist[-self.tau_n:], self.dt, axis=0).mean(axis=0)
-
 				C_t = act_Pdt - est_Pdt 
 				self.C_t = C_t
 
-				# Method 1
 				H_inv = np.linalg.inv(self.H)
 				P_inv = pinv(P_t, eps=self.eps)
 				self.P_inv_t = P_inv
 				self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
+				self.eta_t = self.eta_t.T
 
-				# Method 2
-				# C_inv_t = np.linalg.inv(C_t)
+				# C_inv_t = pinv(C_t, eps=self.eps)
 				# eta_t = self.gamma / 2 * pinv(P_t@self.H.T@C_inv_t@self.H, eps=self.eps)
 				# self.eta_t = eta_t
 
@@ -101,7 +91,7 @@ class LKF(LSProcess):
 
 	def __call__(self, z_t: np.ndarray):
 		''' Observe through filter ''' 
-		self.r.set_f_params(z_t)
+		self.r.set_f_params(z_t, self.err_hist, self.F(self.t))
 		self.r.integrate(self.t + self.dt)
 		x_t, P_t = self.load_vars(self.r.y)
 		self.P_hist.append(P_t)

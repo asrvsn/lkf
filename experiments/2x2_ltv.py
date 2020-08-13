@@ -1,10 +1,9 @@
 """ Partially known LTV example """ 
 
 from systems import *
-from integrator import Integrator
 from utils import set_seed
-from lkf import LKF
-from kf import KF
+from lib.lkf import LKF
+from lib.kf import KF
 
 from typing import Callable
 import numpy as np
@@ -17,7 +16,7 @@ import matplotlib.pyplot as plt
 set_seed(9001)
 
 dt = 1e-3
-T = 60.
+T = 180.
 
 z = TimeVarying(dt, 0.0, 1.0, f=1/20)
 F_hat = lambda t: z.F(0)
@@ -61,7 +60,7 @@ while z.t <= T:
 		break
 
 	# Error condition 3
-	if np.linalg.norm(f2.e_zz_t) > max_zz:
+	if np.linalg.norm(f2.C_t) > max_zz:
 		print('d_zz overflowed!')
 		break
 
