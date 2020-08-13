@@ -10,20 +10,43 @@ import numpy as np
 import pandas as pd
 import pdb
 import scipy.stats as stats
+import scipy.optimize as opt
+import math
+import torch
 
 def pinv(X: np.ndarray, eps: float=1e-4):
 	return np.linalg.solve(X.T@X + eps*np.eye(X.shape[0]), X.T)
 
-class DLKF(LSProcess):
-	def __init__(self, x0: np.ndarray, F: Callable, H: np.ndarray, Q: np.ndarray, R: np.ndarray, dt: float, tau=float('inf'), eta_bnd=float('inf'), eps=1e-4, gamma=1.):
+def trch(x: np.ndarray) -> torch.Tensor:
+	return torch.from_numpy(x).float()
+
+def inner_opt(F_t, A_t, eta_t, C_t, tol: float=1e-4):
+	A_t, C_t = trch(A_t), trch(C_t)
+	eta_t = trch(eta_t).requires_grad_()
+	eta_t = torch.nn.Parameter(eta_t)
+	opt = torch.optim.SGD([eta_t], lr=0.1, momentum=0.98)
+	loss, prev_loss = torch.Tensor([float('inf')]), torch.Tensor([0.])
+
+	while torch.abs(loss - prev_loss).item() > tol:
+		prev_loss = loss
+		loss = (F_t.torch_dot(A_t.T@eta_t.T)).T + F_t.torch_dot(A_t@eta_t.T + eta_t@A_t@eta_t.T) - C_t
+		loss = torch.norm(loss)
+		opt.zero_grad()
+		loss.backward()
+		opt.step()
+
+	return eta_t.detach().numpy()
+
+class DLKF:
+	def __init__(self, x0: np.ndarray, F: Callable, H: np.ndarray, Q: np.ndarray, R: np.ndarray, dt: float, tau=float('inf'), eta_bnd=float('inf'), gamma=1.):
 		self.F = F
 		self.H = H
 		self.Q = Q
 		self.R = R
+		self.t = 0
 		self.dt = dt
 		self.tau = tau
-		self.tau_n = int(self.tau / self.dt)
-		self.eps = eps
+		self.tau_n = math.floor(self.tau / self.dt) - 1
 		self.eta_bnd = eta_bnd
 		self.gamma = gamma
 		self.ndim = x0.shape[0]
@@ -35,50 +58,57 @@ class DLKF(LSProcess):
 
 		self.P_act_till = np.zeros((self.tau_n, self.ndim, self.ndim))
 
-		def f(t, state, z_t):
-			# TODO fix all stateful references in this body
-
-			state = state.reshape(self.ode_shape)
-			x_t, P_t = state[:, :1], state[:, 1:1+self.ndim]
-			z_t = z_t[:, np.newaxis]
-			K_t = P_t@self.H@np.linalg.inv(self.R)
+		def f(t, x_t, P_t, z_t):
 			F_t = self.F(t)
+			M_t = self.H@P_t@self.H.T + self.R
+			K_t = P_t@self.H.T@np.linalg.inv(M_t)
 
 			if t > self.tau: # TODO warmup case?
-				# Method 1
-				err_t, err_tau = self.err_hist[-1][:,np.newaxis], self.err_hist[-self.tau_n][:,np.newaxis]
-				P_tau = self.P_hist[-self.tau_n]
-				act_Pdt = (err_t@err_t.T - err_tau@err_tau.T) / self.tau 
-				est_Pdt = self.H@(P_t - P_tau)@self.H.T / self.tau
+				# # Method 1
+				# err_t = self.err_hist[-1][:,np.newaxis]
+				# act_P = err_t@err_t.T 
+				# est_P = self.H@P_t@self.H.T
 
 				# Method 2
-				# for i in range(self.tau_n):
-				# 	self.P_act_till[i] = np.outer(self.err_hist[-self.tau_n+i], self.err_hist[-self.tau_n+i])
-				# act_Pdt = np.gradient(self.P_act_till, self.dt, axis=0).mean(axis=0)
-				# est_Pdt = np.gradient(self.P_hist[-self.tau_n:], self.dt, axis=0).mean(axis=0)
+				for i in range(self.tau_n):
+					self.P_act_till[i] = np.outer(self.err_hist[-self.tau_n+i], self.err_hist[-self.tau_n+i])
+				act_P = self.P_act_till.mean(axis=0)
+				est_P = sum(self.P_hist[-self.tau_n:]) / self.tau_n
 
-				C_t = act_Pdt - est_Pdt 
+				C_t = act_P - est_P 
 				self.C_t = C_t
 
-				# Method 1
-				H_inv = np.linalg.inv(self.H)
-				P_inv = pinv(P_t, eps=self.eps)
-				self.P_inv_t = P_inv
-				self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
+				# # Method 1
+				# H_inv = np.linalg.inv(self.H)
+				# P_inv = pinv(P_t, eps=self.eps)
+				# self.P_inv_t = P_inv
+				# self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
 
 				# Method 2
 				# C_inv_t = np.linalg.inv(C_t)
 				# eta_t = self.gamma / 2 * pinv(P_t@self.H.T@C_inv_t@self.H, eps=self.eps)
 				# self.eta_t = eta_t
+				
+				# Method 3
+				A_t = P_t - K_t@self.H@P_t
+				eta_t = self.gamma * inner_opt(F_t, A_t, self.eta_t, C_t, tol=1e-6)
+				self.eta_t = eta_t
 
-			F_est = F_t - self.eta_t
-			d_x = F_est@x_t + K_t@(z_t - self.H@x_t)
-			d_P = F_est@P_t + P_t@F_est.T + self.Q - K_t@self.R@K_t.T
-			d_state = np.concatenate((d_x, d_P), axis=1)
-			return d_state.ravel() # Flatten for integrator
+			# # Method 1
+			# zbar_t = z_t - self.H@x_t
+			# Pbar_t = P_t - K_t@self.H@P_t
+			# x_t = F_t@x_t - self.eta_t@x_t + F_t@K_t@zbar_t - self.eta_t@K_t@zbar_t
+			# inner = (F_t@Pbar_t - self.eta_t@Pbar_t).T
+			# P_t = (F_t@inner - self.eta_t@inner).T + self.Q
+			# return x_t, P_t
 
-		def g(t, state):
-			return np.zeros((self.ode_ndim, self.ode_ndim))
+			# Method 2
+			F_t.set_offset(-self.eta_t)
+			x_t = F_t@x_t + F_t@K_t@(z_t - self.H@x_t)
+			P_t = (F_t@(F_t@(P_t - K_t@self.H@P_t)).T).T + self.Q
+			F_t.zero_offset()
+			return x_t, P_t
+		self.f = f
 
 		# state
 		x0 = x0[:, np.newaxis]
@@ -90,35 +120,16 @@ class DLKF(LSProcess):
 		eta0 = np.zeros((self.ndim, self.ndim))
 		self.eta_t = eta0
 
-		iv = np.concatenate((x0, P0), axis=1).ravel() # Flatten for integrator
-		self.r = Integrator(f, g, self.ode_ndim)
-		self.r.set_initial_value(iv, 0.)
-
-	def load_vars(self, state: np.ndarray):
-		state = state.reshape(self.ode_shape)
-		x_t, P_t = state[:, :1], state[:, 1:1+self.ndim]
-		return x_t, P_t
-
 	def __call__(self, z_t: np.ndarray):
 		''' Observe through filter ''' 
-		# self.r.set_f_params(z_t)
-		# self.r.integrate(self.t + self.dt)
-		# x_t, P_t = self.load_vars(self.r.y)
-		# self.P_hist.append(P_t)
-		# self.x_t, self.P_t = x_t, P_t
-		# x_t = np.squeeze(x_t)
-		# err_t = z_t - x_t@self.H.T
-		# self.err_hist.append(err_t)
-		# return x_t.copy(), err_t # x_t variable gets reused somewhere...
-		return z_t, z_t
-
-	@property
-	def ode_shape(self):
-		return (self.ndim, 1 + self.ndim) # representational dimension: x_t, P_t
-
-	@property
-	def ode_ndim(self):
-		return self.ode_shape[0] * self.ode_shape[1] # for raveled representation
+		self.t += self.dt
+		x_t, P_t = self.f(self.t, self.x_t, self.P_t, z_t[:, np.newaxis])
+		self.P_hist.append(P_t)
+		self.x_t, self.P_t = x_t, P_t
+		x_t = np.squeeze(x_t)
+		err_t = z_t - x_t@self.H.T
+		self.err_hist.append(err_t)
+		return x_t.copy(), err_t # x_t variable gets reused somewhere...
 
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt

@@ -103,14 +103,14 @@ class Lorenz(HiddenProcess):
 			du = -sigma(t)*(u-v)
 			dv = rho(t)*u - v - u*w
 			dw = -beta(t)*w + u*v
-			return [du, dv, dw]
+			return np.array([du, dv, dw])
 
-		x0 = [0, 1, 1.05]
+		x0 = np.array([0, 1, 1.05])
 
 		# Init features
 		p, d, k = 2, 3, 9
 		self.obs = PolynomialObservable(p, d, k)
-		proj = lambda x: self.obs.call__numpy(x)
+		proj = lambda x: self.obs.call_numpy(x)
 		H = np.eye(k)
 
 		# Fit linear model
@@ -122,8 +122,8 @@ class Lorenz(HiddenProcess):
 		assert not torch.isnan(self.K).any().item(), 'Got NaN in the model!'
 
 		# Use K as discrete-time model
-		F0 = self.K.cpu().numpy()
-		F = lambda t: F0
+		koop = op.Koopman(self.K.numpy(), self.obs)
+		F = lambda t: koop
 
 		super().__init__(x0, sys, F, proj, dt, H, var_v, k)
 

@@ -9,9 +9,12 @@ from totorch.features import *
 class Koopman:
 	''' Intended for use in numpy land ''' 
 	def __init__(self, K: np.ndarray, obs: Observable, transpose=False):
-		self.K = K
+		self._K = K
+		self.K_torch = torch.from_numpy(K)
 		self.obs = obs
 		self.transpose = transpose
+		self.offset0 = np.zeros(K.shape)
+		self.offset = self.offset0
 
 	def __matmul__(self, X: np.ndarray):
 		if self.transpose:
@@ -26,9 +29,22 @@ class Koopman:
 		else:
 			return self.obs.call_numpy(self.obs.preimage((X@self.K).T)).T
 
+	def torch_dot(self, X: torch.Tensor):
+		return self.obs(self.obs.preimage(self.K_torch@X))
+
 	@property
 	def T(self):
 		return Koopman(self.K, self.obs, transpose=(not self.transpose))
+
+	@property
+	def K(self):
+		return self._K + self.offset
+
+	def set_offset(self, offset: np.ndarray):
+		self.offset = offset
+
+	def zero_offset(self):
+		self.offset = self.offset0
 
 """ Snapshot generation """ 
 

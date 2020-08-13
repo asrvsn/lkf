@@ -2,8 +2,8 @@
 
 from systems import Lorenz
 from utils import set_seed
-from lib.lkf import LKF
-from lib.kf import KF
+from lib.dlkf import DLKF
+from lib.dkf import DKF
 
 from typing import Callable
 import numpy as np
@@ -26,8 +26,8 @@ eta0 = np.zeros((z.ndim, z.ndim))
 eta = lambda t: eta0
 
 print(F_hat(0))
-f1 = KF(x0, F_hat, z.H, z.Q, z.R, dt)
-f2 = LKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.15, eps=1e-2, gamma=0.25)
+f1 = DKF(x0, F_hat, z.H, z.Q, z.R, dt)
+f2 = DLKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.1, gamma=0.9)
 
 max_err = 50.
 max_eta_err = 100
