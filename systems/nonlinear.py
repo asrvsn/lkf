@@ -6,6 +6,7 @@ from scipy.integrate import ode, solve_ivp
 import matplotlib.pyplot as plt
 from typing import Callable
 from mpl_toolkits.mplot3d import Axes3D
+import pdb
 
 from utils import transferop_to_diff
 from totorch.utils import set_seed
@@ -51,7 +52,7 @@ class VanDerPol(HiddenProcess):
 		# Init features
 		p, d, k = 4, 2, 8
 		self.obs = PolynomialObservable(p, d, k)
-		proj = lambda x: self.obs.call__numpy(x)
+		proj = lambda x: self.obs.call_numpy(x)
 		H = np.eye(k)
 
 		# Fit linear model
@@ -62,16 +63,20 @@ class VanDerPol(HiddenProcess):
 		self.K = op.solve(self.x_fit, obs=self.obs)
 		assert not torch.isnan(self.K).any().item(), 'Got NaN in the model!'
 
-		# Compute differential model
-		F0 = transferop_to_diff(self.K)
-		F = lambda t: F0
-		# F = self.K.cpu().numpy()
-		# self.F = lambda t: F
+		# Use K as discrete-time model
+		koop = op.Koopman(self.K.numpy(), self.obs)
+		F = lambda t: koop
 
 		super().__init__(x0, sys, F, proj, dt, H, var_v, k)
 
 	def show_model(self):
-		pred_x = extrapolate(self.x_fit[:,0], self.K, self.obs, self.x_fit.shape[1]-1)
+		koop = op.Koopman(self.K.numpy(), self.obs)
+		test_x = self.obs(self.x_fit)[:, :3].numpy()
+		print(koop@test_x)
+		pdb.set_trace()
+		print(test_x[np.newaxis]@koop.T)
+
+		pred_x = extrapolate(self.x_fit[:,0], self.K, self.obs, self.x_fit.shape[1]-1, unlift_every=False)
 		err = torch.norm(self.x_fit - pred_x, dim=0).cpu().numpy()
 		X = self.x_fit.cpu().numpy()
 		pred_X = pred_x.cpu().numpy()
@@ -116,11 +121,9 @@ class Lorenz(HiddenProcess):
 		self.K = op.solve(self.x_fit, obs=self.obs)
 		assert not torch.isnan(self.K).any().item(), 'Got NaN in the model!'
 
-		# Compute differential model
-		F0 = transferop_to_diff(self.K)
+		# Use K as discrete-time model
+		F0 = self.K.cpu().numpy()
 		F = lambda t: F0
-		# F = self.K.cpu().numpy()
-		# self.F = lambda t: F
 
 		super().__init__(x0, sys, F, proj, dt, H, var_v, k)
 
@@ -150,8 +153,8 @@ class Lorenz(HiddenProcess):
 if __name__ == '__main__':
 	set_seed(9001)
 
-	# z = VanDerPol(1e-4, 1.0)
-	# z.show_model()
-
-	z = Lorenz(5e-3, 1.0)
+	z = VanDerPol(1e-4, 1.0)
 	z.show_model()
+
+	# z = Lorenz(5e-3, 1.0)
+	# z.show_model()

@@ -6,6 +6,30 @@ from typing import Callable, List
 
 from totorch.features import *
 
+class Koopman:
+	''' Intended for use in numpy land ''' 
+	def __init__(self, K: np.ndarray, obs: Observable, transpose=False):
+		self.K = K
+		self.obs = obs
+		self.transpose = transpose
+
+	def __matmul__(self, X: np.ndarray):
+		if self.transpose:
+			return self.obs.call_numpy(self.obs.preimage((self.K.T@X).T)).T
+		else:
+			return self.obs.call_numpy(self.obs.preimage(self.K@X))
+
+	def __rmatmul__(self, X: np.ndarray):
+		print('called!')
+		if self.transpose:
+			return self.obs.call_numpy(self.obs.preimage(X@self.K.T))
+		else:
+			return self.obs.call_numpy(self.obs.preimage((X@self.K).T)).T
+
+	@property
+	def T(self):
+		return Koopman(self.K, self.obs, transpose=(not self.transpose))
+
 """ Snapshot generation """ 
 
 def prep_snapshots(data: torch.Tensor, obs: Observable = None):

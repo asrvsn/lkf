@@ -2,8 +2,8 @@
 
 from systems import VanDerPol
 from utils import set_seed
-from lib.lkf import LKF
-from lib.kf import KF
+from lib.dlkf import DLKF
+from lib.dkf import DKF
 
 from typing import Callable
 import numpy as np
@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 set_seed(9001)
 
-dt = 1e-4
+dt = 1e-3
 T = 10.
 
 z = VanDerPol(dt, 0.1)
@@ -25,8 +25,8 @@ eta0 = np.zeros((z.ndim, z.ndim))
 eta = lambda t: eta0
 
 print(F_hat(0))
-f1 = KF(x0, F_hat, z.H, z.Q, z.R, dt)
-f2 = LKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.1, eps=1e-3, gamma=0.25)
+f1 = DKF(x0, F_hat, z.H, z.Q, z.R, dt)
+f2 = DLKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.1, eps=1e-3, gamma=0.25)
 
 max_err = 10.
 max_eta_err = 100
@@ -54,10 +54,10 @@ while z.t <= T:
 	hist_f2_err.append(err2_t)
 	hist_eta.append(f2.eta_t.copy())
 
-	# Error condition 1
-	if np.linalg.norm(err2_t) > max_err:
-		print('Error overflowed!')
-		break
+	# # Error condition 1
+	# if np.linalg.norm(err2_t) > max_err:
+	# 	print('Error overflowed!')
+	# 	break
 
 	# # Error condition 2
 	# if np.linalg.norm(f2.eta_t - eta(z.t)) > max_eta_err:
@@ -96,7 +96,7 @@ axs[1,0].plot(hist_t, hist_f1_res, color='blue')
 axs[1,0].set_title('Residual')
 
 axs[0,1].plot(hist_z[:,0], hist_z[:,1], color='blue', label='obs')
-axs[0,1].plot(hist_f2_x[:,0], hist_f2_x[:,1], color='orange', label='est')
+# axs[0,1].plot(hist_f2_x[:,0], hist_f2_x[:,1], color='orange', label='est')
 axs[0,1].legend()
 axs[0,1].set_title('LKF')
 
