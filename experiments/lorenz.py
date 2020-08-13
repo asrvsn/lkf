@@ -27,7 +27,7 @@ eta = lambda t: eta0
 
 print(F_hat(0))
 f1 = DKF(x0, F_hat, z.H, z.Q, z.R, dt)
-f2 = DLKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.1, gamma=0.9)
+f2 = DLKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.3, gamma=0.75)
 
 max_err = 50.
 max_eta_err = 100

@@ -75,7 +75,8 @@ class DLKF:
 				act_P = self.P_act_till.mean(axis=0)
 				est_P = sum(self.P_hist[-self.tau_n:]) / self.tau_n
 
-				C_t = act_P - est_P 
+				# C_t = act_P - est_P 
+				C_t = act_P - self.H@P_t@self.H.T
 				self.C_t = C_t
 
 				# # Method 1
