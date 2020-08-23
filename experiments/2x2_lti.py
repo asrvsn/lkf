@@ -19,7 +19,7 @@ dt = 1e-4
 T = 40.
 
 z = Oscillator(dt, 0.0, 1.0)
-eta_mu, eta_var = 0., 0.06
+eta_mu, eta_var = 0., 0.5
 eta0 = np.random.normal(eta_mu, eta_var, (2, 2))
 print('Variation:', eta0)
 eta = lambda t: eta0

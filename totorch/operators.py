@@ -46,6 +46,9 @@ class Koopman:
 	def zero_offset(self):
 		self.offset = self.offset0
 
+	def re_project(self, x: np.ndarray):
+		return self.obs.call_numpy(self.obs.preimage(x))
+
 """ Snapshot generation """ 
 
 def prep_snapshots(data: torch.Tensor, obs: Observable = None):
