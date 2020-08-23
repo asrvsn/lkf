@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 set_seed(9001)
 
 dt = 1e-3
-T = 180.
+T = 60.
 
 z = TimeVarying(dt, 0.0, 1.0, f=1/20)
 F_hat = lambda t: z.F(0)
@@ -28,7 +28,6 @@ f2 = LKF(z.x0, F_hat, z.H, z.Q, z.R, dt, tau=0.25, eps=3e-2, gamma=0.9)
 
 max_err = 2.
 max_eta_err = 100
-max_zz = 100. 
 
 hist_t = []
 hist_z = []
@@ -57,11 +56,6 @@ while z.t <= T:
 	# Error condition 2
 	if np.linalg.norm(f2.eta_t - eta(z.t)) > max_eta_err:
 		print('Variation error overflowed!')
-		break
-
-	# Error condition 3
-	if np.linalg.norm(f2.C_t) > max_zz:
-		print('d_zz overflowed!')
 		break
 
 # start, end = None, 20000 # for case analysis

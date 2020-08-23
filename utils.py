@@ -19,3 +19,6 @@ def diff_to_transferop(A: np.ndarray):
 
 def transferop_to_diff(A: np.ndarray):
 	return np.real(linalg.logm(A, disp=False)[0])
+
+def pinv(X: np.ndarray, eps: float=1e-4):
+	return np.linalg.solve(X.T@X + eps*np.eye(X.shape[0]), X.T)

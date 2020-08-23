@@ -8,7 +8,7 @@ from lib.integrator import Integrator
 from typing import Callable
 import numpy as np
 
-class KF(LSProcess):
+class KF:
 	def __init__(self, x0: np.ndarray, F: Callable, H: np.ndarray, Q: np.ndarray, R: np.ndarray, dt: float):
 		self.F = F
 		self.H = H
@@ -18,41 +18,27 @@ class KF(LSProcess):
 		self.ndim = x0.shape[0]
 		rep_ndim = self.ndim*(self.ndim+1) # representational dimension
 
-		def f(t, state, z_t, F_t):
-			x_t, P_t = self.load_vars(state)
-			z_t = z_t[:, np.newaxis]
-			K_t = P_t@self.H@np.linalg.inv(self.R)
-			d_x = F_t@x_t + K_t@(z_t - self.H@x_t)
-			d_P = F_t@P_t + P_t@F_t.T + self.Q - K_t@self.R@K_t.T
-			d_state = np.concatenate((d_x, d_P), axis=1)
-			return d_state.ravel() # Flatten for integrate.ode
+		# Initial conditions
+		self.t = 0.
+		self.x_t = x0[:, np.newaxis]
+		self.P_t = np.eye(self.ndim)
 
-		def g(t, state):
-			return np.zeros((rep_ndim, rep_ndim))
-
-		x0 = x0[:, np.newaxis]
-		P0 = np.eye(self.ndim)
-		self.x_t = x0
-		self.P_t = P0
-
-		iv = np.concatenate((x0, P0), axis=1).ravel() # Flatten for integrate.ode
-		self.r = Integrator(f, g, rep_ndim)
-		self.r.set_initial_value(iv, 0.)
-
-	def load_vars(self, state: np.ndarray):
-		state = state.reshape((self.ndim, self.ndim+1))
-		x_t, P_t = state[:, :1], state[:, 1:]
-		return x_t, P_t
+	def step(self, z_t):
+		x_t, P_t, H, Q, R = self.x_t, self.P_t, self.H, self.Q, self.R
+		z_t = z_t[:, np.newaxis]
+		F_t = self.F(self.t)
+		K_t = P_t@H@np.linalg.inv(R)
+		dx_dt = F_t@x_t + K_t@(z_t - H@x_t)
+		dP_dt = F_t@P_t + P_t@F_t.T + Q - K_t@R@K_t.T
+		self.t += self.dt
+		self.x_t += dx_dt * self.dt
+		self.P_t += dP_dt * self.dt
 
 	def __call__(self, z_t: np.ndarray):
 		''' Observe through filter ''' 
-		self.r.set_f_params(z_t, self.F(self.t))
-		self.r.integrate(self.t + self.dt)
-		x_t, P_t = self.load_vars(self.r.y)
-		self.x_t, self.P_t = x_t, P_t
-		x_t = np.squeeze(x_t)
-		err_t = z_t - x_t@self.H.T
-		return x_t.copy(), err_t # x_t variable gets reused somewhere...
+		self.step(z_t)
+		err_t = z_t - np.squeeze(self.x_t)@self.H.T
+		return self.x_t.copy(), err_t 
 
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt

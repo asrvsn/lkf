@@ -13,24 +13,23 @@ import scipy.stats as stats
 
 import matplotlib.pyplot as plt
 
-set_seed(9001)
+set_seed(1001)
 
 dt = 1e-4
-T = 100.
+T = 40.
 
 z = Oscillator(dt, 0.0, 1.0)
-eta_mu, eta_var = 0., 0.03
+eta_mu, eta_var = 0., 0.06
 eta0 = np.random.normal(eta_mu, eta_var, (2, 2))
+print('Variation:', eta0)
 eta = lambda t: eta0
 F_hat = lambda t: z.F(t) + eta(t)
 
-print(F_hat(0))
 f1 = KF(z.x0, F_hat, z.H, z.Q, z.R, dt)
 f2 = LKF(z.x0, F_hat, z.H, z.Q, z.R, dt, tau=0.25, eps=1e-3, gamma=0.25)
 
 max_err = 2.
 max_eta_err = 100
-max_zz = 100. 
 
 hist_t = []
 hist_z = []
@@ -59,11 +58,6 @@ while z.t <= T:
 	# Error condition 2
 	if np.linalg.norm(f2.eta_t - eta(z.t)) > max_eta_err:
 		print('Variation error overflowed!')
-		break
-
-	# Error condition 3
-	if np.linalg.norm(f2.C_t) > max_zz:
-		print('d_zz overflowed!')
 		break
 
 # start, end = None, 20000 # for case analysis

@@ -16,21 +16,21 @@ class Koopman:
 		self.offset0 = np.zeros(K.shape)
 		self.offset = self.offset0
 
-	def __matmul__(self, X: np.ndarray):
+	def __matmul__(self, x: np.ndarray):
 		if self.transpose:
-			return self.obs.call_numpy(self.obs.preimage((self.K.T@X).T)).T
+			return self.obs.call_numpy(self.obs.preimage((self.K.T@x).T)).T
 		else:
-			return self.obs.call_numpy(self.obs.preimage(self.K@X))
+			return self.obs.call_numpy(self.obs.preimage(self.K@x))
 
-	def __rmatmul__(self, X: np.ndarray):
+	def __rmatmul__(self, x: np.ndarray):
 		print('called!')
 		if self.transpose:
-			return self.obs.call_numpy(self.obs.preimage(X@self.K.T))
+			return self.obs.call_numpy(self.obs.preimage(x@self.K.T))
 		else:
-			return self.obs.call_numpy(self.obs.preimage((X@self.K).T)).T
+			return self.obs.call_numpy(self.obs.preimage((x@self.K).T)).T
 
-	def torch_dot(self, X: torch.Tensor):
-		return self.obs(self.obs.preimage(self.K_torch@X))
+	def torch_dot(self, x: torch.Tensor):
+		return self.obs(self.obs.preimage(self.K_torch@x))
 
 	@property
 	def T(self):
