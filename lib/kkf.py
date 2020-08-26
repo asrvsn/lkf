@@ -11,7 +11,7 @@ from totorch.operators import Koopman
 
 class KKF:
 	def __init__(self, x0: np.ndarray, K: Koopman, H: np.ndarray, Q: np.ndarray, R: np.ndarray, dt: float):
-		self.K = K
+		self.F = lambda x: (K@x - x) / dt # Approximate differential model with forward-difference
 		self.H = H
 		self.Q = Q
 		self.R = R
@@ -26,14 +26,13 @@ class KKF:
 
 	def step(self, z_t):
 		x_t, P_t, H, Q, R = self.x_t, self.P_t, self.H, self.Q, self.R
-		F_t = (self.K@x_t - x_t) / self.dt # Approximate differential model with forward-difference
 		z_t = z_t[:, np.newaxis]
-		K_t = P_t@H@np.linalg.inv(R) # Kalman gain, different from Koopman op
-		dx_dt = F_t@x_t + K_t@(z_t - H@x_t) # TODO: re-project?
-		dP_dt = F_t@P_t + P_t@F_t.T + Q - K_t@R@K_t.T # TODO: re-project?
+		K_t = P_t@H@np.linalg.inv(R) 
+		dx_dt = self.F(x_t) + K_t@(z_t - H@x_t) 
+		dP_dt = self.F(P_t) + self.F(P_t.T).T + Q - K_t@R@K_t.T 
 		self.t += self.dt
-		self.x_t += dx_dt * self.dt
-		self.P_t += dP_dt * self.dt
+		self.x_t += dx_dt * self.dt # TODO: re-project?
+		self.P_t += dP_dt * self.dt # TODO: re-project?
 
 	def __call__(self, z_t: np.ndarray):
 		''' Observe through filter ''' 

@@ -1,6 +1,6 @@
 """ Noisy LTI example """ 
 
-from systems import *
+from systems.linear import *
 from utils import set_seed
 from lib.lkf import LKF
 from lib.kf import KF
@@ -24,6 +24,8 @@ eta0 = np.random.normal(eta_mu, eta_var, (2, 2))
 print('Variation:', eta0)
 eta = lambda t: eta0
 F_hat = lambda t: z.F(t) + eta(t)
+
+# pdb.set_trace()
 
 f1 = KF(z.x0, F_hat, z.H, z.Q, z.R, dt)
 f2 = LKF(z.x0, F_hat, z.H, z.Q, z.R, dt, tau=0.25, eps=1e-3, gamma=0.25)

@@ -6,19 +6,21 @@ from lib.integrator import *
 from typing import Callable
 import numpy as np
 import scipy.integrate as scint
+import pdb
 
 class LSProcess:
 	''' Linear stochastic hidden proocess ''' 
-	def __init__(self, x0: np.ndarray, F: callable, H: np.ndarray, dt: float, var_w: float, var_v: float, w_bnd: tuple = (-float('inf'), float('inf')), v_bnd: tuple = (-float('inf'), float('inf'))):
+	def __init__(self, x0: np.ndarray, F: callable, H: np.ndarray, dt: float, var_w: float, var_v: float):
 		assert x0.shape[0] == H.shape[0] == F(0).shape[0]
 		self.ndim = x0.shape[0]
 		self.x0 = x0
 		self.F = F
 		self.H = H
 		self.dt = dt
+		self.var_v = var_v
+		self.var_w = var_w
 		self.Q = np.eye(x0.shape[0]) * var_w
 		self.R = np.eye(x0.shape[0]) * var_v
-		self.w_bnd, self.v_bnd = w_bnd, v_bnd
 
 		def f(t, x_t, F_t):
 			return x_t@F_t.T
@@ -26,7 +28,6 @@ class LSProcess:
 		def g(t, x_t):
 			return self.Q
 
-		# TODO use w_bnd
 		self.r = Integrator(f, g, self.ndim)
 		self.r.set_initial_value(x0, 0.)
 
@@ -35,8 +36,8 @@ class LSProcess:
 		self.r.set_f_params(self.F(self.t))
 		self.r.integrate(self.t + self.dt)
 		x_t = self.r.y
-		v_t = self.R @ np.random.normal(0.0, np.sqrt(self.dt), self.ndim)
-		z_t = self.H@x_t + np.clip(v_t, self.v_bnd[0], self.v_bnd[1])
+		v_t = self.R@np.random.normal(0.0, np.sqrt(self.dt), self.ndim)
+		z_t = self.H@x_t + v_t
 		return z_t 
 
 	@property
@@ -45,8 +46,18 @@ class LSProcess:
 
 
 class BoundedLSProcess(LSProcess):
-	def __init__(self, x0: np.ndarray, F: callable, H: np.ndarray, dt: float, var_w: float, var_v: float):
-		super().__init__(x0, F, H, dt, var_w, var_v, w_bnd=(-3*np.sqrt(var_w), 3*np.sqrt(var_w)), v_bnd=(-3*np.sqrt(var_v), 3*np.sqrt(var_v)))
+	def __init__(self, *args, w_sig_bnd=3, v_sig_bnd=3):
+		self.w_sig_bnd = w_sig_bnd
+		self.v_sig_bnd = v_sig_bnd
+		super().__init__(*args)
+
+	def __call__(self):
+		self.r.set_f_params(self.F(self.t))
+		self.r.integrate(self.t + self.dt)
+		x_t = self.r.y
+		v_t = self.R@np.random.normal(0.0, np.sqrt(self.dt), self.ndim)
+		z_t = self.H@x_t + np.clip(v_t, -self.v_sig_bnd*np.sqrt(self.var_v), self.v_sig_bnd*np.sqrt(self.var_v))
+		return z_t 
 
 class Oscillator(BoundedLSProcess):
 	def __init__(self, dt: float, var_w: float, var_v: float):
@@ -72,15 +83,15 @@ class SpiralSource(BoundedLSProcess):
 class TimeVarying(BoundedLSProcess):
 	""" Smooth interpolation between spiral sink, center, spiral source systems """ 
 	def __init__(self, dt: float, var_w: float, var_v: float, f=1/5):
-		self.F0 = np.array([[-1.05,-3.60],[1.10, 1.05]])
-		self.F1 = np.array([[-1.15864464, -3.68960651], [1.06937006,  0.91600663]])
-		self.F2 = np.array([[-0.98092249, -3.67973989], [1.06922538,  1.20720164]])
+		F0 = np.array([[-1.05,-3.60],[1.10, 1.05]])
+		F1 = np.array([[-1.15864464, -3.68960651], [1.06937006,  0.91600663]])
+		F2 = np.array([[-0.98092249, -3.67973989], [1.06922538,  1.20720164]])
 		def F(t: float):
 			a = np.sin(2*np.pi*f*t)
 			if a >= 0:
-				return (1 - a)*self.F0 + a*self.F1
+				return (1 - a)*F0 + a*F1
 			else:
-				return (1 + a)*self.F0 - a*self.F2
+				return (1 + a)*F0 - a*F2
 		H = np.eye(2)
 		x0 = np.array([-1., -1.])
 		super().__init__(x0, F, H, dt, var_w, var_v)

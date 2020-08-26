@@ -1,6 +1,6 @@
 """ Partially known LTV example """ 
 
-from systems import *
+from systems.linear import *
 from utils import set_seed
 from lib.lkf import LKF
 from lib.kf import KF
@@ -18,13 +18,15 @@ set_seed(9001)
 dt = 1e-3
 T = 60.
 
-z = TimeVarying(dt, 0.0, 1.0, f=1/20)
+z = TimeVarying(dt, 0.0, 1.0, f=1/5)
 F_hat = lambda t: z.F(0)
 eta = lambda t: F_hat(t) - z.F(t)
 
 print(F_hat(0))
 f1 = KF(z.x0, F_hat, z.H, z.Q, z.R, dt)
 f2 = LKF(z.x0, F_hat, z.H, z.Q, z.R, dt, tau=0.25, eps=3e-2, gamma=0.9)
+
+# pdb.set_trace()
 
 max_err = 2.
 max_eta_err = 100

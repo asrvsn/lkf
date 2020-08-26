@@ -15,7 +15,7 @@ class LKF:
 		x0: np.ndarray, K: Koopman, H: np.ndarray, Q: np.ndarray, R: np.ndarray, 	# KF parameters
 		dt: float, tau=float('inf'), eps=1e-4, gamma=1.								# Hyperparameters
 	):
-		self.K = K
+		self.F = lambda x: (K@x - x) / dt # Approximate differential model with forward-difference
 		self.H = H
 		self.Q = Q
 		self.R = R
@@ -40,8 +40,7 @@ class LKF:
 	def step(self, z_t):
 		x_t, P_t, H, Q, R, tau = self.x_t, self.P_t, self.H, self.Q, self.R, self.tau
 		z_t = z_t[:, np.newaxis]
-		F_t = (self.K@x_t - x_t) / self.dt # Approximate differential model with forward-difference
-		K_t = P_t@H@np.linalg.inv(R) # Kalman gain, different from Koopman op
+		K_t = P_t@H@np.linalg.inv(R) 
 
 		if self.t > self.tau: # TODO: warm start?
 			# Method 1
@@ -67,9 +66,9 @@ class LKF:
 			# C_inv_t = np.linalg.inv(C_t)
 			# self.eta_t = self.gamma / 2 * pinv(P_t@H.T@C_inv_t@H, eps=self.eps)
 
-		F_est = F_t - self.eta_t
-		dx_dt = F_est@x_t + K_t@(z_t - H@x_t) # TODO: re-project?
-		dP_dt = F_est@P_t + P_t@F_est.T + Q - K_t@R@K_t.T # TODO: re-project?
+		F_est = lambda x: self.F(x) - self.eta_t@x # TODO: re-project eta?
+		dx_dt = F_est(x_t) + K_t@(z_t - H@x_t) # TODO: re-project?
+		dP_dt = F_est(P_t) + F_est(P_t.T).T + Q - K_t@R@K_t.T # TODO: re-project?
 		self.t += self.dt
 		self.x_t += dx_dt * self.dt
 		self.P_t += dP_dt * self.dt
