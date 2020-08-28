@@ -29,7 +29,7 @@ class LKKF:
 
 		# Initial conditions
 		self.t = 0.
-		self.x_t = x0[:, np.newaxis]
+		self.x_t = x0.copy()[:, np.newaxis]
 		self.P_t = np.eye(self.ndim)
 		self.eta_t = np.zeros((self.ndim, self.ndim))
 

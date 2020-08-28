@@ -28,13 +28,12 @@ class LKF:
 
 		# Initial conditions
 		self.t = 0.
-		self.x_t = x0[:, np.newaxis]
+		self.x_t = x0.copy()[:, np.newaxis]
 		self.P_t = np.eye(self.ndim)
 		self.eta_t = np.zeros((self.ndim, self.ndim))
 
 		# Memory
 		self.err_hist = []
-		self.P_hist = []
 
 	def step(self, z_t):
 		x_t, P_t, H, Q, R, tau = self.x_t, self.P_t, self.H, self.Q, self.R, self.tau
@@ -42,29 +41,18 @@ class LKF:
 		F_t = self.F(self.t)
 		K_t = P_t@H@np.linalg.inv(R)
 
-		if self.t > self.tau: # TODO: warm start?
-			# Method 1
+		if self.t > tau: # TODO: warm start?
 			err_t, err_tau = self.err_hist[-1][:,np.newaxis], self.err_hist[0][:,np.newaxis]
-			P_tau = self.P_hist[0]
-			act_dPdt = (err_t@err_t.T - err_tau@err_tau.T) / tau 
-			est_dPdt = H@(P_t - P_tau)@H.T / tau
-
-			# Method 2
-			# for i in range(self.tau_n):
-			# 	self.P_act_till[i] = np.outer(self.err_hist[-self.tau_n+i], self.err_hist[-self.tau_n+i])
-			# act_Pdt = np.gradient(self.P_act_till, self.dt, axis=0).mean(axis=0)
-			# est_Pdt = np.gradient(self.P_hist[-self.tau_n:], self.dt, axis=0).mean(axis=0)
-
-			C_t = act_dPdt - est_dPdt 
+			C_t = (err_t@err_t.T - err_tau@err_tau.T) / tau 
 
 			# Method 1
-			H_inv = np.linalg.inv(H)
-			P_inv = pinv(P_t, eps=self.eps)
-			self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
+			# H_inv = np.linalg.inv(H)
+			# P_inv = pinv(P_t, eps=self.eps)
+			# self.eta_t = self.gamma * H_inv@C_t@H_inv.T@P_inv / 2
 
 			# Method 2
-			# C_inv_t = np.linalg.inv(C_t)
-			# self.eta_t = self.gamma / 2 * pinv(P_t@H.T@C_inv_t@H, eps=self.eps)
+			C_inv_t = np.linalg.inv(C_t)
+			self.eta_t = self.gamma * pinv(P_t@H.T@C_inv_t@H, eps=self.eps) / 2
 
 		F_est = F_t - self.eta_t
 		dx_dt = F_est@x_t + K_t@(z_t - H@x_t)
@@ -77,10 +65,8 @@ class LKF:
 		''' Observe through filter ''' 
 		self.step(z_t)
 		err_t = z_t - np.squeeze(self.x_t)@self.H.T
-		self.P_hist.append(self.P_t)
 		self.err_hist.append(err_t)
 		if self.t > self.tau:
-			del self.P_hist[0]
 			del self.err_hist[0]
 		return self.x_t.copy(), err_t 
 

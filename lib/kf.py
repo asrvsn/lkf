@@ -1,10 +1,6 @@
 ''' Continuous-time Kalman filter
 '''
 
-from systems import *
-from utils import set_seed
-from lib.integrator import Integrator
-
 from typing import Callable
 import numpy as np
 
@@ -20,7 +16,7 @@ class KF:
 
 		# Initial conditions
 		self.t = 0.
-		self.x_t = x0[:, np.newaxis]
+		self.x_t = x0.copy()[:, np.newaxis]
 		self.P_t = np.eye(self.ndim)
 
 	def step(self, z_t):
@@ -42,6 +38,8 @@ class KF:
 
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt
+	from systems.linear import *
+	from utils import set_seed
 
 	set_seed(6008)
 

@@ -1,6 +1,6 @@
 """ Noisy LTI example """ 
 
-from systems.linear import *
+from systems.linear import Oscillator
 from utils import set_seed
 from lib.lkf import LKF
 from lib.kf import KF
@@ -13,22 +13,20 @@ import scipy.stats as stats
 
 import matplotlib.pyplot as plt
 
-set_seed(1001)
+set_seed(9001)
 
 dt = 1e-4
 T = 40.
+x0 = np.array([-1., -1.])
 
-z = Oscillator(dt, 0.0, 1.0)
-eta_mu, eta_var = 0., 0.5
-eta0 = np.random.normal(eta_mu, eta_var, (2, 2))
-print('Variation:', eta0)
-eta = lambda t: eta0
-F_hat = lambda t: z.F(t) + eta(t)
+z = Oscillator(x0, dt, 0.0, 1.0)
+eta_mu, eta_var = 0., 0.1
+eta = np.random.normal(eta_mu, eta_var, (2, 2))
+F_hat = lambda t: z.F(t) + eta
+print('Variation:', eta)
 
-# pdb.set_trace()
-
-f1 = KF(z.x0, F_hat, z.H, z.Q, z.R, dt)
-f2 = LKF(z.x0, F_hat, z.H, z.Q, z.R, dt, tau=0.25, eps=1e-3, gamma=0.25)
+f1 = KF(x0, F_hat, z.H, z.Q, z.R, dt)
+f2 = LKF(x0, F_hat, z.H, z.Q, z.R, dt, tau=0.5, eps=5e-3, gamma=0.25)
 
 max_err = 2.
 max_eta_err = 100
@@ -42,13 +40,15 @@ hist_f2_err = []
 hist_eta = []
 while z.t <= T:
 	z_t = z()
-	x1_t, err1_t = f1(z_t)
-	x2_t, err2_t = f2(z_t)
 	hist_z.append(z_t)
 	hist_t.append(z.t)
+
+	x1_t, err1_t = f1(z_t)
 	hist_f1_x.append(x1_t) 
-	hist_f2_x.append(x2_t) 
 	hist_f1_err.append(err1_t)
+
+	x2_t, err2_t = f2(z_t)
+	hist_f2_x.append(x2_t) 
 	hist_f2_err.append(err2_t)
 	hist_eta.append(f2.eta_t.copy())
 
@@ -58,7 +58,7 @@ while z.t <= T:
 		break
 
 	# Error condition 2
-	if np.linalg.norm(f2.eta_t - eta(z.t)) > max_eta_err:
+	if np.linalg.norm(f2.eta_t - eta) > max_eta_err:
 		print('Variation error overflowed!')
 		break
 

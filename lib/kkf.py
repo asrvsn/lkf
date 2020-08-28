@@ -21,7 +21,7 @@ class KKF:
 
 		# Initial conditions
 		self.t = 0.
-		self.x_t = x0[:, np.newaxis]
+		self.x_t = x0.copy()[:, np.newaxis]
 		self.P_t = np.eye(self.ndim)
 
 	def step(self, z_t):
