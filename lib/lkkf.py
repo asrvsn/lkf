@@ -1,4 +1,4 @@
-''' Learning continuous-time Kalman filter
+''' Learning Koopman-operator based Kalman filter for identifying nonlinear systems
 '''
 
 from typing import Callable
@@ -10,7 +10,7 @@ import scipy.stats as stats
 from utils import *
 from totorch.operators import Koopman
 
-class LKF:
+class LKKF:
 	def __init__(self, 
 		x0: np.ndarray, K: Koopman, H: np.ndarray, Q: np.ndarray, R: np.ndarray, 	# KF parameters
 		dt: float, tau=float('inf'), eps=1e-4, gamma=1.								# Hyperparameters
